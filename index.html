@@ -1,0 +1,83 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Checklist Pensador Guerrero</title>
+
+<link rel="manifest" href="./manifest.webmanifest">
+<meta name="theme-color" content="#0b0f14">
+<link rel="apple-touch-icon" href="./icons/icon-192.png">
+
+<style>
+body{
+  margin:0;
+  font-family:system-ui;
+  background:#0b0f14;
+  color:#e8eef7;
+  padding:16px;
+}
+.card{
+  background:#121925;
+  border-radius:14px;
+  padding:14px;
+  margin:12px 0;
+}
+label{display:flex;gap:10px;margin:10px 0}
+button{
+  width:100%;
+  padding:12px;
+  border-radius:10px;
+  border:none;
+  background:#36d399;
+  font-weight:bold;
+}
+</style>
+</head>
+
+<body>
+
+<h2>⚔️ Checklist Pensador Guerrero</h2>
+
+<div class="card">
+<label><input type="checkbox" id="body"> 🥊 Cuerpo (10 min)</label>
+<label><input type="checkbox" id="project"> 💻 Proyecto (5 min)</label>
+<label><input type="checkbox" id="noNightEat"> 🍽️ No comer de noche</label>
+<label><input type="checkbox" id="discomfort"> ⚔️ Incomodidad</label>
+<label><input type="checkbox" id="winDay"> 🏆 Día ganado</label>
+
+<button onclick="resetDay()">Reset hoy</button>
+</div>
+
+<script>
+const STORAGE="pg_checklist_v1";
+
+function load(){
+  try{return JSON.parse(localStorage.getItem(STORAGE))||{}}catch{return {}}
+}
+function save(s){localStorage.setItem(STORAGE,JSON.stringify(s))}
+
+const state=load();
+
+["body","project","noNightEat","discomfort","winDay"].forEach(id=>{
+  const el=document.getElementById(id);
+  el.checked=!!state[id];
+  el.onchange=()=>{
+    state[id]=el.checked;
+    save(state);
+  };
+});
+
+function resetDay(){
+  localStorage.removeItem(STORAGE);
+  location.reload();
+}
+
+// SW
+if("serviceWorker" in navigator){
+  navigator.serviceWorker.register("./sw.js");
+}
+</script>
+
+</body>
+</html>
