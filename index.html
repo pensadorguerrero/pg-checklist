@@ -54,30 +54,124 @@ button{
 </div>
 
 <script>
-const STORAGE="pg_checklist_v1";
+const STORAGE="pg_checklist_v2";
 
+// --- helpers ---
+const pad2 = (n)=> String(n).padStart(2,"0");
+const todayKey = ()=>{
+  const d = new Date();
+  return `${d.getFullYear()}-${pad2(d.getMonth()+1)}-${pad2(d.getDate())}`;
+};
+const daysBetween = (a,b)=> Math.floor((b-a)/(1000*60*60*24));
+
+// --- load/save ---
 function load(){
-  try{return JSON.parse(localStorage.getItem(STORAGE))||{}}catch{return {}}
+  try{
+    return JSON.parse(localStorage.getItem(STORAGE)) || null;
+  }catch{
+    return null;
+  }
 }
-function save(s){localStorage.setItem(STORAGE,JSON.stringify(s))}
+function save(s){ localStorage.setItem(STORAGE, JSON.stringify(s)); }
 
-const state=load();
-
-["body","project","noNightEat","discomfort","winDay"].forEach(id=>{
-  const el=document.getElementById(id);
-  el.checked=!!state[id];
-  el.onchange=()=>{
-    state[id]=el.checked;
-    save(state);
+// --- state ---
+let state = load();
+if(!state){
+  state = {
+    startDate: todayKey(),
+    date: todayKey(),
+    checks: { body:false, project:false, noNightEat:false, discomfort:false, winDay:false },
+    winsTotal: 0,
+    streak: 0,
+    lastCountedWinDate: null
   };
-});
+  save(state);
+}
+
+// Si cambió el día: resetea checks y gestiona racha (si ayer no fue ganado, racha = 0)
+const t = todayKey();
+if(state.date !== t){
+  const prevWasWin = state.checks?.winDay === true;
+  if(!prevWasWin) state.streak = 0;
+
+  state.date = t;
+  state.checks = { body:false, project:false, noNightEat:false, discomfort:false, winDay:false };
+  save(state);
+}
+
+// --- bind UI ---
+const ids = ["body","project","noNightEat","discomfort","winDay"];
+const els = Object.fromEntries(ids.map(id=>[id, document.getElementById(id)]));
+
+function refreshCounters(){
+  const start = new Date(state.startDate + "T00:00:00");
+  const now = new Date(state.date + "T00:00:00");
+  const total = daysBetween(start, now) + 1;
+
+  document.getElementById("daysTotal").textContent = total;
+  document.getElementById("winsTotal").textContent = state.winsTotal;
+  document.getElementById("streak").textContent = state.streak;
+}
+
+function refreshChecks(){
+  ids.forEach(id => els[id].checked = !!state.checks[id]);
+
+  // Día ganado solo si están los 4 bloques hechos
+  const all4 = state.checks.body && state.checks.project && state.checks.noNightEat && state.checks.discomfort;
+  els.winDay.disabled = !all4;
+  if(!all4){
+    state.checks.winDay = false;
+    els.winDay.checked = false;
+  }
+}
+
+function persist(){
+  save(state);
+  refreshChecks();
+  refreshCounters();
+}
+
+function onChange(){
+  state.checks.body = els.body.checked;
+  state.checks.project = els.project.checked;
+  state.checks.noNightEat = els.noNightEat.checked;
+  state.checks.discomfort = els.discomfort.checked;
+
+  const all4 = state.checks.body && state.checks.project && state.checks.noNightEat && state.checks.discomfort;
+  els.winDay.disabled = !all4;
+
+  // Día ganado: cuenta SOLO una vez por día
+  if(els.winDay.checked && all4){
+    state.checks.winDay = true;
+
+    if(state.lastCountedWinDate !== state.date){
+      state.winsTotal += 1;
+      state.streak += 1;
+      state.lastCountedWinDate = state.date;
+    }
+  } else {
+    state.checks.winDay = false;
+    // No restamos winsTotal si lo desmarcas; si quieres que sí, dímelo y lo ajusto.
+  }
+
+  persist();
+}
+
+ids.forEach(id => els[id].addEventListener("change", onChange));
 
 function resetDay(){
-  localStorage.removeItem(STORAGE);
-  location.reload();
+  state.checks = { body:false, project:false, noNightEat:false, discomfort:false, winDay:false };
+  save(state);
+  refreshChecks();
+  refreshCounters();
 }
+window.resetDay = resetDay;
 
-// SW
+// --- init ---
+refreshChecks();
+refreshCounters();
+
+// --- SW ---
 if("serviceWorker" in navigator){
   navigator.serviceWorker.register("./sw.js");
 }
